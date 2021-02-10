@@ -107,6 +107,24 @@ def isolate_250T(df):#pass in deep copy
         df.iloc[0,indx]= new_val
     return df
 
+def breakdown(df1,df2):#df1 = crane_type1, df2 = crane_type2
+    df1_normal_hrs = extract_normal(df1)#all normal hrs
+    df1_OT_hrs = extract_OT(df1) #all OT hours
+    df2_normal_hrs = extract_normal(df2)
+    df2_OT_hrs = extract_OT(df2)
+    #create df_breakdown DataFrame
+    df_breakdown_crane1 = pd.DataFrame(columns =['normal hours','OT hours'])
+    df_breakdown_crane2 = pd.DataFrame(columns =['normal hours','OT hours'])
+    #create Counter
+    c1_normal = Counter(df1_normal_hrs)
+    c1_OT = Counter(df1_OT_hrs)
+    c2_normal = Counter(df2_normal_hrs)
+    c2_OT = Counter(df2_OT_hrs)
+    #counter stored in list
+    c1_lst=[c1_normal,cl_OT]
+    c2_lst=[c2_normal,c2_OT]
+    #for crane1:
+    
 #driver
 if __name__ == '__main__':
     read_path = str(input("Please enter in file location of test file:\n"))
@@ -118,4 +136,5 @@ if __name__ == '__main__':
     sheet_names = tuple(df_master.keys())
     df_result = join(df_master,sheet_names)
     df_crane_type1 = isolate_100T(df_result.copy(deep=True))
+    df_crane_type2 = isolate_250T(df_result.copy(deep=True))
     write(write_path,df_result)
