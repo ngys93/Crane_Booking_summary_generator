@@ -1,1 +1,80 @@
+import pandas as pd
+from collections import Counter
+import numpy as np
 
+def read_excel(path):
+    df_master = pd.read_excel(path,sheet_name=None,header=None)
+    return df_master # all sheets, use df.keys() to get sheet name
+
+def write(path,df):
+    with pd.ExcelWriter(path) as writer:
+        df.to_excel(writer,sheet_name = 'Enter in sheet name', index = True)
+
+def transpost(df):
+    return df.T
+
+def align_format(df):
+    lst2 = list(df.iloc[0,1:])
+    lst1 = reindex_duration(lst2)
+    df.iloc[0,1:] = lst1
+    return df
+
+def reindex_duration(lst2):#rearrange duration
+    dic = {'start':0, 'middle':'-','end':0}
+    from datetime import time
+    s = 8
+    h = 8
+    lst=[]
+    dic['start'] = time(hour = int(s),minute=0,second=0)
+    dic['end'] = time(hour = int(h),minute=0,second=0)
+    for indx in lst2:
+        if h+1<24:
+            h+=1
+            dic['end'] = time(hour = int(h),minute=0,second=0)
+        else:
+            h=0
+            dic['end'] = time(hour = int(h),minute=0,second=0)
+        indx = str(dic['start'])+dic['middle']+str(dic['end'])
+        lst.append(indx)
+        if s+1<24:
+            s+=1
+            dic['start'] = time(hour = int(s),minute=0,second=0)
+        else:
+            s=0
+            dic['start'] = time(hour = int(s),minute=0,second=0)
+    lst = lst[:len(lst)]
+    dic_tem = {'Duration':lst}
+    return lst
+
+def rename(df,sheet):
+    df.iloc[0,0] = 'Time'
+    col = list(df.columns)[1:]
+    for col_name in col:
+        df.rename(columns ={col_name:sheet},inplace=True)
+    return df
+
+def join(df_master,sheet_names):
+    global time_lst
+    df_result = pd.DataFrame(time_lst)#empty dataframe
+    for sheet in sheet_names:
+        df_output = df_master[sheet]
+        df_output = rename(transpost(align_format(df_output)),sheet)
+        df_result= df_result.merge(df_output.iloc[:,1:],
+                                   how='left',
+                                   left_index = True,right_index=True)
+    #fill blanks with 0
+    df_result.fillna(0,inplace=True)
+    return df_result
+#driver
+if __name__ == '__main__':
+    read_path = str(input("Please enter in file location of test file:\n"))
+    read_path = read_path.replace('\\','/')
+    write_path = str(input("Please enter in file location of result file:\n"))
+    write_path = write_path.replace('\\','/')
+    #read master file
+    df_master = read_excel(read_path)
+    sheet_names = tuple(df_master.keys())
+    #sheet = sheet_names[0]
+    #df_sheet = rename(transpost(align_format(df_master[sheet])),sheet)
+    df_result = join(df_master,sheet_names)
+    write(write_path,df_result)
