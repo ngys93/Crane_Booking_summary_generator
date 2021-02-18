@@ -12,14 +12,19 @@ time_lst = ['Time',
             '02:00:00-03:00:00','03:00:00-04:00:00','04:00:00-05:00:00',
             '05:00:00-06:00:00','06:00:00-07:00:00','07:00:00-08:00:00']
 
-
 def read_excel(path):
     df_master = pd.read_excel(path,sheet_name=None,header=None)
     return df_master # all sheets, use df.keys() to get sheet name
 
-def write(path,df):
+def write(path,df_result,df_100T,df_250T,df_breakdown_100T,df_breakdown_250T):
     with pd.ExcelWriter(path) as writer:
-        df.to_excel(writer,sheet_name = 'Enter in sheet name', index = True)
+        df_breakdown_100T.to_excel(writer,sheet_name = '100T breakdown',
+                                   index = True)
+        df_breakdown_250T.to_excel(writer,sheet_name = '250T breakdown',
+                                   index = True)
+        df_100T.to_excel(writer,sheet_name = '100T', index = True)
+        df_250T.to_excel(writer,sheet_name = '250T', index = True)
+        df_result.to_excel(writer,sheet_name = 'master sheet', index = True)
 
 def transpost(df):
     return df.T
@@ -78,53 +83,69 @@ def join(df_master,sheet_names):
     df_result.iloc[24,1:]=0
     return df_result
 
-def extract_normat(df):
-    return df.iloc[0:9,:]
+def extract_normal(df):
+    return df.iloc[0:10,:]#extract normal hours
 
 def extract_OT(df):
-    return df.iloc[10:,:]
+    return df.iloc[[0,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24],:]#extract OT hours
 
 def isolate_100T(df):#pass in deep copy
-    crane_type = tuple(df_mastercopy.iloc[0,1:])
-    for crane in crane_type:
-        if 'Mobile Crane (100T)' not in crane:
-            df.drop(columns = crane,inplace=True)
-    l1 = len(list(df.columns))
-    for indx in range(1:l1+1):
-        val = df.iloc[0,indx]
-        new_val = val[20:]
-        df.iloc[0,indx]= new_val
-    return df
+    dic={}
+    col_indx = [i for i in range(len(df.columns))]
+    for num in range(1,len(df.columns)):
+        if 'Mobile Crane (100T)' not in df.iloc[0,num]:
+            col_indx.remove(num)
+    df_new = df.iloc[:,col_indx]
+    s1=set(df_new.iloc[0,1:])
+    for i in s1:
+        dic[i]=i[20:]
+    df_new.replace(dic,inplace=True)
+    return df_new
 
 def isolate_250T(df):#pass in deep copy
-    crane_type = tuple(df_mastercopy.iloc[0,1:])
-    for crane in crane_type:
-        if 'Mobile Crane (250T)' not in crane:
-            df.drop(columns = crane,inplace=True)
-    for indx in range(1:l1+1):
-        val = df.iloc[0,indx]
-        new_val = val[20:]
-        df.iloc[0,indx]= new_val
-    return df
+    dic={}
+    col_indx = [i for i in range(len(df.columns))]
+    for num in range(1,len(df.columns)):
+        if 'Mobile Crane (250T)' not in df.iloc[0,num]:
+            col_indx.remove(num)
+    df_new = df.iloc[:,col_indx]
+    s1=set(df_new.iloc[0,1:])
+    for i in s1:
+        dic[i]=i[20:]
+    df_new.replace(dic,inplace=True)
+    return df_new
 
-def breakdown(df1,df2):#df1 = crane_type1, df2 = crane_type2
-    df1_normal_hrs = extract_normal(df1)#all normal hrs
-    df1_OT_hrs = extract_OT(df1) #all OT hours
-    df2_normal_hrs = extract_normal(df2)
-    df2_OT_hrs = extract_OT(df2)
-    #create df_breakdown DataFrame
-    df_breakdown_crane1 = pd.DataFrame(columns =['normal hours','OT hours'])
-    df_breakdown_crane2 = pd.DataFrame(columns =['normal hours','OT hours'])
+def breakdown(df):
+    df_normal_hrs = extract_normal(df)#all normal hrs
+    df_OT_hrs = extract_OT(df) #all OT hours
+    normal_hrs_lst = df_normal_hrs.iloc[1:,1:].values
+    normal_hrs_lst = normal_hrs_lst.flatten('C')
+    OT_hrs_lst = df_OT_hrs.iloc[1:,1:].values
+    OT_hrs_lst = OT_hrs_lst.flatten('C')
     #create Counter
-    c1_normal = Counter(df1_normal_hrs)
-    c1_OT = Counter(df1_OT_hrs)
-    c2_normal = Counter(df2_normal_hrs)
-    c2_OT = Counter(df2_OT_hrs)
+    counter_normal = Counter(normal_hrs_lst)
+    counter_OT = Counter(OT_hrs_lst)
+    print(counter_normal)
+    print(counter_OT)
     #counter stored in list
-    c1_lst=[c1_normal,cl_OT]
-    c2_lst=[c2_normal,c2_OT]
-    #for crane1:
-    
+    counter_lst=[counter_normal,counter_OT]
+    #for crane1
+    length_normal=len(counter_normal.keys())
+    length_OT = len(counter_OT.keys())
+    if length_normal > length_OT:
+        df_breakdown = pd.DataFrame(columns=['normal hrs','OT hrs'],
+                                    index = counter_normal.keys())
+    elif length_normal < length_OT:
+        df_breakdown = pd.DataFrame(columns=['normal hrs','OT hrs'],
+                                    index = counter_OT.keys())
+    else:
+        df_breakdown = pd.DataFrame(columns=['normal hrs','OT hrs'],
+                                    index = counter_normal.keys())
+    for indx in df_breakdown.index:
+        df_breakdown.at[indx,'normal_hrs']=counter_normal[indx]
+        df_breakdown.at[indx,'OT_hrs']=counter_OT[indx]
+    df_breakdown.drop(index = 0,inplace=True)
+    return df_breakdown.iloc[:,2:]
 #driver
 if __name__ == '__main__':
     read_path = str(input("Please enter in file location of test file:\n"))
@@ -135,6 +156,12 @@ if __name__ == '__main__':
     df_master = read_excel(read_path)
     sheet_names = tuple(df_master.keys())
     df_result = join(df_master,sheet_names)
-    df_crane_type1 = isolate_100T(df_result.copy(deep=True))
-    df_crane_type2 = isolate_250T(df_result.copy(deep=True))
-    write(write_path,df_result)
+    df_result_copy1 = df_result.copy(deep = True)
+    df_result_copy2 = df_result.copy(deep = True)
+    df_100T = isolate_100T(df_result_copy1)
+    df_250T= isolate_250T(df_result_copy2)
+    #trial
+    df_breakdown_100T = breakdown(df_100T)
+    df_breakdown_250T = breakdown(df_250T)
+    write(write_path,df_result,df_100T,df_250T,df_breakdown_100T,df_breakdown_250T)
+    print('Mobile Crane breakdown summary generated')
